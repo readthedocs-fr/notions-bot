@@ -1,0 +1,18 @@
+plugins {
+    id 'java'
+}
+
+group 'tech.hokkaydo'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+compileJava.options.encoding = 'UTF-8'
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation 'com.discord4j:discord4j-core:3.1.0'
+    compile group: 'com.googlecode.json-simple', name: 'json-simple', version: '1.1.1'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
+}
