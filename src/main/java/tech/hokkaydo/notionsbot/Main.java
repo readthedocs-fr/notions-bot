@@ -70,7 +70,6 @@ public class Main {
 
             try (Scanner scanner = new Scanner(response)) {
                 String responseBody = scanner.useDelimiter("\\A").next();
-                System.out.println(responseBody);
 
                 Map<Integer, Integer> pathScore = new HashMap<>();
                 JSONParser parser = new JSONParser();
@@ -89,7 +88,6 @@ public class Main {
                     }
                     if(score > 0) {
                         pathScore.put(i, score);
-                        System.out.println(i + " " + score + " " + path + " " + Arrays.toString(pathWords));
                     }
                 }
                 if(pathScore.size() == 0){
