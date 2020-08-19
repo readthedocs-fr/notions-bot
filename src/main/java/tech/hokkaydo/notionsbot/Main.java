@@ -60,7 +60,7 @@ public class Main {
     }
 
     private static Optional<Map.Entry<String, String>> getNotion(List<String> keywords)  {
-        String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/3f6f6c7758296ecfeb64f6b33175022b8c7e642d?recursive=true";
+        String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/ef526d77f84e99f55d7e6b685354684893c78f05?recursive=true";
 
         try {
             URLConnection connection = new URL(url).openConnection();
