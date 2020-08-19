@@ -28,11 +28,12 @@ public class Main {
         final String token = args[0];
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
-
+        assert gateway != null;
         gateway.on(MessageCreateEvent.class).subscribe(event -> {
             final Message message = event.getMessage();
             if (message.getContent().startsWith("!notions")) {
                 final MessageChannel channel = message.getChannel().block();
+                assert channel != null;
                 List<String> keywords = Arrays.asList(message.getContent().replace("!notions", "").split(" "));
                 getNotion(keywords).ifPresentOrElse(
                         entry -> channel.createEmbed(embed ->
@@ -59,7 +60,7 @@ public class Main {
     }
 
     private static Optional<Map.Entry<String, String>> getNotion(List<String> keywords)  {
-        String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/c5e2becb277af9f0ae497ba823160c9bc8439d93?recursive=true";
+        String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/3f6f6c7758296ecfeb64f6b33175022b8c7e642d?recursive=true";
 
         try {
             URLConnection connection = new URL(url).openConnection();
