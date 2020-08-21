@@ -5,6 +5,8 @@ import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.channel.MessageChannel;
+import discord4j.core.object.presence.Activity;
+import discord4j.core.object.presence.Presence;
 import discord4j.rest.util.Color;
 import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONArray;
@@ -18,33 +20,86 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Created by Hokkaydo on 17-08-2020.
  */
 public class Main {
 
+    private static final String PREFIX = "?";
+
     public static void main(String[] args) {
+
         final String token = args[0];
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
-        assert gateway != null;
+
+        final String botMention = "<@!" + gateway.getSelf().block().getId().asString() + ">";
+
+        gateway.updatePresence(Presence.online(Activity.watching("Type " + PREFIX + "notions <tags> to find a sheet"))).block();
+
         gateway.on(MessageCreateEvent.class).subscribe(event -> {
             final Message message = event.getMessage();
-            if (message.getContent().startsWith("!notions")) {
+
+            //Filter commands
+            final String commandRegex = "^(\\" + PREFIX + "|" + botMention + ").*";
+            if(!message.getContent().matches(commandRegex)) return;
+
+            //Remove message prefix
+            final String messageContent = message.getContent().startsWith(PREFIX) ?
+                    (
+                            //Check for whitespace between prefix and command
+                            message.getContent().startsWith(PREFIX + " ") ?
+                                    message.getContent().substring(PREFIX.length() + 1) :
+                                    message.getContent().substring(PREFIX.length())
+                    )
+                    :
+                    (
+                            //Check for whitespace between prefix and command
+                            message.getContent().startsWith(botMention + " ") ?
+                                    message.getContent().substring(botMention.length() + 1) :
+                                    message.getContent().substring(botMention.length())
+                    );
+
+            List<String> splitContent = Arrays.asList(messageContent.split(" "));
+
+            if (splitContent.get(0).equalsIgnoreCase("notions")) {
                 final MessageChannel channel = message.getChannel().block();
-                assert channel != null;
-                List<String> keywords = Arrays.asList(message.getContent().replace("!notions", "").split(" "));
-                getNotion(keywords).ifPresentOrElse(
-                        entry -> channel.createEmbed(embed ->
-                                embed
-                                        .setColor(Color.GREEN)
-                                        .addField("Notion - " + entry.getKey(), "Notion trouvée pour les mots `" + getAsString(keywords) +  "` : \n" + new String(entry.getValue().getBytes(), StandardCharsets.UTF_8), true)
-                        ).block(),
-                        () -> channel.createEmbed(embed ->
-                                embed
-                                        .setColor(Color.RED)
-                                        .addField("Notion not found", "Aucune notion trouvée pour les mots `" + getAsString(keywords) + "`", true)
+
+                List<String> keywords = splitContent.subList(1, splitContent.size());
+
+                getNotion(keywords).ifPresentOrElse(entry ->
+                                channel.createEmbed(embed -> {
+                                    StringBuilder stringBuilder = new StringBuilder();
+                                    AtomicInteger i = new AtomicInteger(1);
+
+                                    entry.forEach(s -> stringBuilder
+                                            .append(i.getAndIncrement())
+                                            .append(". ")
+                                            .append(s.getKey())
+                                            .append(" - ")
+                                            .append(s.getValue())
+                                            .append("\n\n")
+                                    );
+
+                                    embed.setColor(Color.GREEN).addField(
+                                            "Notion - " + entry.get(0).getKey(),
+                                            "Notion" + (entry.size() > 1 ? "s "  : " ") + "trouvée" + (entry.size() > 1 ? "s "  : " ") +
+                                                    "pour les mots `" + getAsString(keywords) + "` : \n\n" +
+                                                    new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
+                                            true
+                                    );
+                                }).block(),
+
+                        () -> channel.createEmbed(embed -> embed.setColor(Color.RED).addField(
+                                "Notion not found",
+                                "Aucune notion trouvée pour les mots `" + getAsString(keywords) + "`",
+                                true
+                                )
+
                         ).block()
                 );
             }
@@ -59,7 +114,7 @@ public class Main {
         return stringBuilder.toString();
     }
 
-    private static Optional<Map.Entry<String, String>> getNotion(List<String> keywords)  {
+    private static Optional<List<Map.Entry<String, String>>> getNotion(List<String> keywords)  {
         String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/master?recursive=true";
 
         try {
@@ -71,15 +126,20 @@ public class Main {
             try (Scanner scanner = new Scanner(response)) {
                 String responseBody = scanner.useDelimiter("\\A").next();
 
-                Map<Integer, Integer> pathScore = new HashMap<>();
+                Map<Integer, Integer> pathScoreMap = new HashMap<>();
                 JSONParser parser = new JSONParser();
                 JSONObject jsonObject = (JSONObject) parser.parse(responseBody);
                 JSONArray tree = (JSONArray) jsonObject.get("tree");
                 for (int i = 0; i < tree.size(); i++) {
                     JSONObject object = (JSONObject) tree.get(i);
                     String path = (String) object.get("path");
-                    String[] pathWords = path.split("([._/])");
+
+                    //Filtering .md files
                     if(!path.split("/")[path.split("/").length - 1].endsWith(".md")) continue;
+
+                    String[] duplicatedPathWords = path.toLowerCase().replaceAll(".md", "").split("([_/])");
+                    String [] pathWords = Arrays.stream(duplicatedPathWords).collect(Collectors.groupingBy(Function.identity())).keySet().toArray(new String[0]);
+
                     int score = 0;
                     for(String keyword : keywords){
                         for(String pathWord : pathWords){
@@ -87,31 +147,48 @@ public class Main {
                         }
                     }
                     if(score > 0) {
-                        pathScore.put(i, score);
+                        pathScoreMap.put(i, score);
                     }
                 }
-                if(pathScore.size() == 0){
+                if(pathScoreMap.size() == 0){
                     return Optional.empty();
                 }
-                pathScore = sortByValue(pathScore);
-                int i = new ArrayList<>(pathScore.keySet()).get(new ArrayList<>(pathScore.keySet()).size() - 1);
-                String path = (String) ((JSONObject)tree.get(i)).get("path");
-                return Optional.of(new Map.Entry<>() {
-                    @Override
-                    public String getKey() {
-                        return path.split("/")[path.split("/").length - 1];
-                    }
 
-                    @Override
-                    public String getValue() {
-                        return "https://github.com/readthedocs-fr/notions/blob/master/" + path;
-                    }
+                pathScoreMap = sortByValue(pathScoreMap);
 
-                    @Override
-                    public String setValue(String value) {
-                        return null;
-                    }
-                });
+                List<Integer> indexList = new ArrayList<>(pathScoreMap.keySet());
+                int maxScore = pathScoreMap.get(indexList.get(0));
+                List<Integer> maxScoredIndexes = new ArrayList<>();
+
+                //Filter max 9 entries because Discord doesn't support more than 30 lines in one embed
+                for (int i = 0; i < indexList.size() && i < 9; i++) {
+                    if(pathScoreMap.get(indexList.get(i)) == maxScore) maxScoredIndexes.add(indexList.get(i));
+                }
+
+                List<Map.Entry<String, String>> maxScoredNotions = new ArrayList<>();
+
+                for (Integer maxScoredIndex : maxScoredIndexes) {
+
+                    String path = (String) ((JSONObject)tree.get(maxScoredIndex)).get("path");
+
+                    maxScoredNotions.add(new Map.Entry<>() {
+                        @Override
+                        public String getKey() {
+                            return path.split("/")[path.split("/").length - 1];
+                        }
+
+                        @Override
+                        public String getValue() {
+                            return "https://github.com/readthedocs-fr/notions/blob/master/" + path;
+                        }
+
+                        @Override
+                        public String setValue(String value) {
+                            return null;
+                        }
+                    });
+                }
+                return Optional.of(maxScoredNotions);
             }
         }catch (IOException | ParseException ioe){
             ioe.printStackTrace();
@@ -125,6 +202,7 @@ public class Main {
                 new LinkedList<>(unsortMap.entrySet());
 
         list.sort(Map.Entry.comparingByValue());
+        Collections.reverse(list);
 
         Map<Integer, Integer> result = new LinkedHashMap<>();
         for (Map.Entry<Integer, Integer> entry : list) {
