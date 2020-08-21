@@ -1,15 +1,30 @@
-plugins {
-    id 'java'
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:6.0.0'
+    }
 }
+
+plugins {
+    id "application"
+}
+
 
 group 'tech.hokkaydo'
 version '1.0-SNAPSHOT'
+
+mainClassName = 'tech.hokkaydo.notionsbot.Main'
 
 repositories {
     mavenCentral()
 }
 
 compileJava.options.encoding = 'UTF-8'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     implementation 'com.discord4j:discord4j-core:3.1.0'
