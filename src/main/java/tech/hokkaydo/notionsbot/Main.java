@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -37,28 +39,19 @@ public class Main {
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
 
-        //The bot mention format changes across platforms
-        final String mobileBotMention = "<@" + gateway.getSelf().block().getId().asString() + ">";
-        final String computerBotMention = "<@!" + gateway.getSelf().block().getId().asString() + ">";
-
         gateway.updatePresence(Presence.online(Activity.watching("Type " + PREFIX + "notions <tags> to find a sheet"))).block();
 
         gateway.on(MessageCreateEvent.class).subscribe(event -> {
             final Message message = event.getMessage();
 
-            //Filter commands
-            final String commandRegex = "^(\\" + PREFIX + "|" + computerBotMention + "|" + mobileBotMention + ").*";
-            if(!message.getContent().matches(commandRegex)) return;
+            final Matcher prefixRegexMatcher = Pattern
+                    .compile("^(\\" + PREFIX + "\\s?|<@!?" + gateway.getSelf().block().getId().asString() + ">\\s?)(.*)")
+                    .matcher(message.getContent());
 
-            final String messageContent = getMessageWithoutPrefix(
-                    message.getContent(),
-                    mobileBotMention,
-                    computerBotMention,
-                    PREFIX,
-                    mobileBotMention + " ",
-                    computerBotMention + " ",
-                    PREFIX + " "
-            );
+            if(!prefixRegexMatcher.matches()) return;
+
+            //Remove prefix
+            final String messageContent = message.getContent().replaceFirst(Pattern.quote(prefixRegexMatcher.group(1)), "");
 
             List<String> splitContent = Arrays.asList(messageContent.split(" "));
 
@@ -108,15 +101,6 @@ public class Main {
         StringBuilder stringBuilder = new StringBuilder();
         list.forEach(s -> stringBuilder.append(s).append(" "));
         return stringBuilder.toString();
-    }
-
-    private static String getMessageWithoutPrefix(String message, String... prefixes){
-        for(String prefix : prefixes){
-            if(message.startsWith(prefix)){
-                return message.startsWith(prefix + " ") ? message.substring(prefix.length() + 1) : message.substring(prefix.length());
-            }
-        }
-        return message;
     }
 
     private static Optional<List<Map.Entry<String, String>>> getNotion(List<String> keywords)  {
