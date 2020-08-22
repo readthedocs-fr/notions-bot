@@ -44,6 +44,7 @@ public class Main {
         gateway.on(MessageCreateEvent.class).subscribe(event -> {
             final Message message = event.getMessage();
 
+            //Filter commands
             final Matcher prefixRegexMatcher = Pattern
                     .compile("^(\\" + PREFIX + "\\s?|<@!?" + gateway.getSelf().block().getId().asString() + ">\\s?)(.*)")
                     .matcher(message.getContent());
