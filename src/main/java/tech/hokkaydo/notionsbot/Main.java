@@ -37,7 +37,9 @@ public class Main {
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
 
-        final String botMention = "<@" + gateway.getSelf().block().getId().asString() + ">";
+        //The bot mention format changes across platforms
+        final String mobileBotMention = "<@" + gateway.getSelf().block().getId().asString() + ">";
+        final String computerBotMention = "<@!" + gateway.getSelf().block().getId().asString() + ">";
 
         gateway.updatePresence(Presence.online(Activity.watching("Type " + PREFIX + "notions <tags> to find a sheet"))).block();
 
@@ -45,24 +47,18 @@ public class Main {
             final Message message = event.getMessage();
 
             //Filter commands
-            final String commandRegex = "^(\\" + PREFIX + "|" + botMention + ").*";
+            final String commandRegex = "^(\\" + PREFIX + "|" + computerBotMention + "|" + mobileBotMention + ").*";
             if(!message.getContent().matches(commandRegex)) return;
 
-            //Remove message prefix
-            final String messageContent = message.getContent().startsWith(PREFIX) ?
-                    (
-                            //Check for whitespace between prefix and command
-                            message.getContent().startsWith(PREFIX + " ") ?
-                                    message.getContent().substring(PREFIX.length() + 1) :
-                                    message.getContent().substring(PREFIX.length())
-                    )
-                    :
-                    (
-                            //Check for whitespace between prefix and command
-                            message.getContent().startsWith(botMention + " ") ?
-                                    message.getContent().substring(botMention.length() + 1) :
-                                    message.getContent().substring(botMention.length())
-                    );
+            final String messageContent = getMessageWithoutPrefix(
+                    message.getContent(),
+                    mobileBotMention,
+                    computerBotMention,
+                    PREFIX,
+                    mobileBotMention + " ",
+                    computerBotMention + " ",
+                    PREFIX + " "
+            );
 
             List<String> splitContent = Arrays.asList(messageContent.split(" "));
 
@@ -112,6 +108,15 @@ public class Main {
         StringBuilder stringBuilder = new StringBuilder();
         list.forEach(s -> stringBuilder.append(s).append(" "));
         return stringBuilder.toString();
+    }
+
+    private static String getMessageWithoutPrefix(String message, String... prefixes){
+        for(String prefix : prefixes){
+            if(message.startsWith(prefix)){
+                return message.startsWith(prefix + " ") ? message.substring(prefix.length() + 1) : message.substring(prefix.length());
+            }
+        }
+        return message;
     }
 
     private static Optional<List<Map.Entry<String, String>>> getNotion(List<String> keywords)  {
