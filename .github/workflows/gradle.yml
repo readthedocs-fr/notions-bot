@@ -1,0 +1,86 @@
+name: Java CI with Gradle
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+
+  compile:
+    runs-on: ubuntu-latest
+    name: Running Java ${{ matrix.java }} compile
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 13
+        uses: actions/setup-java@v1
+        with:
+          java-version: 13
+      - name: Compile code
+        run: gradle compileJava
+
+  test:
+    runs-on: ubuntu-latest
+    name: Running tests
+    needs: compile
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 13
+        uses: actions/setup-java@v1
+        with:
+          java-version: 13
+      - name: Run unit tests
+        run: gradle test
+
+  build:
+    runs-on: ubuntu-latest
+    name: Run gradle shadowJar
+    needs: test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 13
+        uses: actions/setup-java@v1
+        with:
+          java-version: 13
+      - name: Build with Gradle
+        run: gradle shadowJar
+
+  #deploy:
+    #if: github.event_name == 'push' && contains(github.ref, '/heads/master')
+    #runs-on: ubuntu-latest
+    #name: Deploy the JAR file to the remote server
+    #needs: build
+      #steps:
+      #- uses: actions/checkout@v2
+        #- name: Set up JDK 13
+        #uses: actions/setup-java@v1
+          #with:
+          #java-version: 13
+        # - name: Generate the file
+        #run: gradle shadowJar
+        #- name: Run a script on remote server (stop the application)
+        #if: always()
+        #uses: fifsky/ssh-action@master
+          #with:
+          #command: |
+          #cd home/Luka/NotionsBot/ && ./stopbot.sh
+          #host: ${{ secrets.HOST }}
+          #user: ${{ secrets.SSH_USER }}
+        #pass: ${{ secrets.SSH_PASSWORD }}
+        #- name: Deploy the package to the remote server
+        #uses: garygrossgarten/github-action-scp@release
+          #with:
+          #local: target/NotionsBot-1.0-SNAPSHOT-all.jar
+          #remote: home/Luka/NotionsBot/NotionsBot-1.0-SNAPSHOT-all.jar
+          #host: ${{ secrets.HOST }}
+          #username: ${{ secrets.SSH_USER }}
+        #password: ${{ secrets.SSH_PASSWORD }}
+        #- name: Run a script on remote server (start the application)
+        #if: always()
+        #uses: fifsky/ssh-action@master
+          #with:
+          #command: |
+          #cd home/Luka/NotionsBot/ && ./startbot.sh
+          #host: ${{ secrets.HOST }}
+          #user: ${{ secrets.SSH_USER }}
+        #pass: ${{ secrets.SSH_PASSWORD }}
