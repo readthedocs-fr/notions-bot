@@ -67,10 +67,7 @@ public class Main {
                                     AtomicInteger i = new AtomicInteger(1);
 
                                     if(notions.size() == 1){
-                                        stringBuilder
-                                                .append(notions.get(0).getKey())
-                                                .append(" - ")
-                                                .append(notions.get(0).getValue());
+                                        stringBuilder.append(notions.get(0).getValue());
                                     }else {
                                         notions.forEach(s -> stringBuilder
                                                 .append(i.getAndIncrement())
