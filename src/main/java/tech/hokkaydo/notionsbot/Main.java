@@ -61,25 +61,32 @@ public class Main {
 
                 List<String> keywords = splitContent.subList(1, splitContent.size());
 
-                getNotion(keywords).ifPresentOrElse(entry ->
+                getNotion(keywords).ifPresentOrElse(notions ->
                                 channel.createEmbed(embed -> {
                                     StringBuilder stringBuilder = new StringBuilder();
                                     AtomicInteger i = new AtomicInteger(1);
 
-                                    entry.forEach(s -> stringBuilder
-                                            .append(i.getAndIncrement())
-                                            .append(". ")
-                                            .append(s.getKey())
-                                            .append(" - ")
-                                            .append(s.getValue())
-                                            .append("\n\n")
-                                    );
+                                    if(notions.size() == 1){
+                                        stringBuilder
+                                                .append(notions.get(0).getKey())
+                                                .append(" - ")
+                                                .append(notions.get(0).getValue());
+                                    }else {
+                                        notions.forEach(s -> stringBuilder
+                                                .append(i.getAndIncrement())
+                                                .append(". ")
+                                                .append(s.getKey())
+                                                .append(" - ")
+                                                .append(s.getValue())
+                                                .append("\n\n")
+
+                                        );
+                                    }
 
                                     embed.setColor(Color.GREEN).addField(
-                                            "Notion - " + entry.get(0).getKey(),
-                                            "Notion" + (entry.size() > 1 ? "s "  : " ") + "trouvée" + (entry.size() > 1 ? "s "  : " ") +
-                                                    "pour les mots `" + getAsString(keywords) + "` : \n\n" +
-                                                    new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
+                                            "Notion - " + notions.get(0).getKey(),
+                                            (notions.size() > 1 ? "Notions trouvées pour les mots `" + getAsString(keywords) + "` : \n\n" : "")
+                                                    + new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
                                             true
                                     );
                                 }).block(),
@@ -126,6 +133,9 @@ public class Main {
 
                     //Filtering .md files
                     if(!path.split("/")[path.split("/").length - 1].endsWith(".md")) continue;
+
+                    //Avoid README files
+                    if(path.split("/")[path.split("/").length - 1].equalsIgnoreCase("README.md")) continue;
 
                     String[] duplicatedPathWords = path.toLowerCase().replaceAll(".md", "").split("([_/])");
                     String [] pathWords = Arrays.stream(duplicatedPathWords).collect(Collectors.groupingBy(Function.identity())).keySet().toArray(new String[0]);
