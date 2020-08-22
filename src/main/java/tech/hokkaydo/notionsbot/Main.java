@@ -37,7 +37,7 @@ public class Main {
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
 
-        final String botMention = "<@!" + gateway.getSelf().block().getId().asString() + ">";
+        final String botMention = "<@" + gateway.getSelf().block().getId().asString() + ">";
 
         gateway.updatePresence(Presence.online(Activity.watching("Type " + PREFIX + "notions <tags> to find a sheet"))).block();
 
