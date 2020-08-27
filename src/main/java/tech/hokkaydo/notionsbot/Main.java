@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -37,28 +39,20 @@ public class Main {
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
 
-        //The bot mention format changes across platforms
-        final String mobileBotMention = "<@" + gateway.getSelf().block().getId().asString() + ">";
-        final String computerBotMention = "<@!" + gateway.getSelf().block().getId().asString() + ">";
-
         gateway.updatePresence(Presence.online(Activity.watching("Type " + PREFIX + "notions <tags> to find a sheet"))).block();
 
         gateway.on(MessageCreateEvent.class).subscribe(event -> {
             final Message message = event.getMessage();
 
             //Filter commands
-            final String commandRegex = "^(\\" + PREFIX + "|" + computerBotMention + "|" + mobileBotMention + ").*";
-            if(!message.getContent().matches(commandRegex)) return;
+            final Matcher prefixRegexMatcher = Pattern
+                    .compile("^(\\" + PREFIX + "\\s?|<@!?" + gateway.getSelf().block().getId().asString() + ">\\s?)(.*)")
+                    .matcher(message.getContent());
 
-            final String messageContent = getMessageWithoutPrefix(
-                    message.getContent(),
-                    mobileBotMention,
-                    computerBotMention,
-                    PREFIX,
-                    mobileBotMention + " ",
-                    computerBotMention + " ",
-                    PREFIX + " "
-            );
+            if(!prefixRegexMatcher.matches()) return;
+
+            //Remove prefix
+            final String messageContent = message.getContent().replaceFirst(Pattern.quote(prefixRegexMatcher.group(1)), "");
 
             List<String> splitContent = Arrays.asList(messageContent.split(" "));
 
@@ -67,25 +61,29 @@ public class Main {
 
                 List<String> keywords = splitContent.subList(1, splitContent.size());
 
-                getNotion(keywords).ifPresentOrElse(entry ->
+                getNotion(keywords).ifPresentOrElse(notions ->
                                 channel.createEmbed(embed -> {
                                     StringBuilder stringBuilder = new StringBuilder();
                                     AtomicInteger i = new AtomicInteger(1);
 
-                                    entry.forEach(s -> stringBuilder
-                                            .append(i.getAndIncrement())
-                                            .append(". ")
-                                            .append(s.getKey())
-                                            .append(" - ")
-                                            .append(s.getValue())
-                                            .append("\n\n")
-                                    );
+                                    if(notions.size() == 1){
+                                        stringBuilder.append(notions.get(0).getValue());
+                                    }else {
+                                        notions.forEach(s -> stringBuilder
+                                                .append(i.getAndIncrement())
+                                                .append(". ")
+                                                .append(s.getKey())
+                                                .append(" - ")
+                                                .append(s.getValue())
+                                                .append("\n\n")
+
+                                        );
+                                    }
 
                                     embed.setColor(Color.GREEN).addField(
-                                            "Notion - " + entry.get(0).getKey(),
-                                            "Notion" + (entry.size() > 1 ? "s "  : " ") + "trouvée" + (entry.size() > 1 ? "s "  : " ") +
-                                                    "pour les mots `" + getAsString(keywords) + "` : \n\n" +
-                                                    new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
+                                            "Notion - " + notions.get(0).getKey(),
+                                            (notions.size() > 1 ? "Notions trouvées pour les mots `" + getAsString(keywords) + "` : \n\n" : "")
+                                                    + new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
                                             true
                                     );
                                 }).block(),
@@ -110,15 +108,6 @@ public class Main {
         return stringBuilder.toString();
     }
 
-    private static String getMessageWithoutPrefix(String message, String... prefixes){
-        for(String prefix : prefixes){
-            if(message.startsWith(prefix)){
-                return message.startsWith(prefix + " ") ? message.substring(prefix.length() + 1) : message.substring(prefix.length());
-            }
-        }
-        return message;
-    }
-
     private static Optional<List<Map.Entry<String, String>>> getNotion(List<String> keywords)  {
         String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/master?recursive=true";
 
@@ -141,6 +130,9 @@ public class Main {
 
                     //Filtering .md files
                     if(!path.split("/")[path.split("/").length - 1].endsWith(".md")) continue;
+
+                    //Avoid README files
+                    if(path.split("/")[path.split("/").length - 1].equalsIgnoreCase("README.md")) continue;
 
                     String[] duplicatedPathWords = path.toLowerCase().replaceAll(".md", "").split("([_/])");
                     String [] pathWords = Arrays.stream(duplicatedPathWords).collect(Collectors.groupingBy(Function.identity())).keySet().toArray(new String[0]);
