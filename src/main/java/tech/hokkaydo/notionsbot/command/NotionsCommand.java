@@ -167,7 +167,7 @@ public class NotionsCommand implements Command {
     private String getAsString(List<?> list){
         StringBuilder stringBuilder = new StringBuilder();
         list.forEach(s -> stringBuilder.append(s).append(" "));
-        return stringBuilder.substring(0, stringBuilder.toString().length() - 2);
+        return stringBuilder.substring(0, stringBuilder.toString().length() - 1);
     }
     private boolean filter(String str) {
         String[] files = SPLIT.split(str);
