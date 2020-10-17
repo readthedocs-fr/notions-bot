@@ -1,5 +1,7 @@
 package tech.hokkaydo.notionsbot;
 
+import java.util.Objects;
+
 import discord4j.core.DiscordClient;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
@@ -17,7 +19,7 @@ public class Main {
         final String token = args[0];
         final DiscordClient client = DiscordClient.create(token);
         final GatewayDiscordClient gateway = client.login().block();
-        assert gateway != null;
+        gateway = Objects.requireNonNull(gateway);
         final CommandManager commandManager = new CommandManager();
         commandManager.setCommands(gateway);
 
