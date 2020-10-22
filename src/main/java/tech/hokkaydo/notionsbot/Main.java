@@ -18,8 +18,7 @@ public class Main {
 
         final String token = args[0];
         final DiscordClient client = DiscordClient.create(token);
-        final GatewayDiscordClient gateway = client.login().block();
-        gateway = Objects.requireNonNull(gateway);
+        final GatewayDiscordClient gateway = Objects.requireNonNull(client.login().block());
         final CommandManager commandManager = new CommandManager();
         commandManager.setCommands(gateway);
 
