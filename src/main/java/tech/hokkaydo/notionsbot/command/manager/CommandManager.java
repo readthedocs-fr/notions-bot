@@ -3,19 +3,13 @@ package tech.hokkaydo.notionsbot.command.manager;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.message.MessageCreateEvent;
 import discord4j.core.object.entity.Message;
-import discord4j.core.object.entity.channel.MessageChannel;
-import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tech.hokkaydo.notionsbot.command.NotionsCommand;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
