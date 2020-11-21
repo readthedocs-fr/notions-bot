@@ -21,6 +21,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,7 +35,9 @@ import java.util.stream.Collectors;
  */
 public class NotionsCommand implements Command {
 
-    final private static Pattern SPLIT = Pattern.compile("[/_]");
+    final private static Pattern SPACE_SPLITTER = Pattern.compile(" ");
+    final private static Pattern SLASH_SPLITTER = Pattern.compile("/");
+    final private static Pattern PATH_SPLITTER = Pattern.compile("[/_]");
 
     public void executeCommand(CommandContext commandContext){
         List<String> keywords = commandContext.getArgs();
@@ -43,32 +46,29 @@ public class NotionsCommand implements Command {
             if(notions.isEmpty()){
                 commandContext.getChannel().createEmbed(embed ->
                         embed.setColor(Color.RED).addField(
-                                "Notion not found",
+                                "Notion introuvable",
                                 "Aucune notion trouvée pour les mots `" + getAsString(Objects.requireNonNull(keywords)) + "`",
                                 false
                         )
                 ).subscribe();
             }else{
                 StringBuilder stringBuilder = new StringBuilder();
-                AtomicInteger i = new AtomicInteger(0);
+                AtomicInteger i = new AtomicInteger(1);
 
                 AtomicBoolean firstSent = new AtomicBoolean(false);
                 if(notions.size() == 1){
                     stringBuilder.append(notions.get(0).getT2());
                 }else {
                     for (Tuple2<String, String> notion : notions) {
-                        if (("Notion - " + (!firstSent.get() ? notions.get(0).getT1() : "Suite")).length() + stringBuilder.toString().length() + (i.getAndIncrement() + ". " + notion.getT1() + " - " + notion.getT2() + "\n\n").length() > 1024) {
+                        String name = getNotionNameFromPath(notion.getT1());
+                        String line = i.getAndIncrement() + ". " + name + " - [" + notion.getT1().substring(0, notion.getT1().lastIndexOf("/")) + "](" + notion.getT2() + ")\n\n";
+                        if (("Notion - " + (!firstSent.get() ? notions.get(0).getT1() : "Suite")).length() + stringBuilder.toString().length() + line.length() > 1024) {
                             sendEmbed(keywords, notions, commandContext.getChannel(), stringBuilder, firstSent);
                             firstSent.set(true);
                             stringBuilder.delete(0, stringBuilder.toString().length());
                         }
-                        stringBuilder
-                                .append(i.get())
-                                .append(". ")
-                                .append(notion.getT1())
-                                .append(" - ")
-                                .append(notion.getT2())
-                                .append("\n\n");
+
+                        stringBuilder.append(line);
                     }
                 }
 
@@ -86,11 +86,33 @@ public class NotionsCommand implements Command {
 
     private void sendEmbed(List<String> keywords, List<Tuple2<String, String>> notions, MessageChannel channel, StringBuilder stringBuilder, AtomicBoolean firstSent) {
         channel.createEmbed(embed -> embed.setColor(Color.GREEN).addField(
-                "Notion - " + (!firstSent.get() ? notions.get(0).getT1() : "Suite"),
+                "Notion - " + (!firstSent.get() ? getNotionNameFromPath(notions.get(0).getT1()) : "Suite"),
                 (!firstSent.get() ? (notions.size() > 1 ? "Notions trouvées pour les mots `" + getAsString(Objects.requireNonNull(keywords)) + "` : \n\n" : "") : "")
-                        + new String(stringBuilder.toString().getBytes(), StandardCharsets.UTF_8),
+                        + stringBuilder.toString(),
                 false
         )).subscribe();
+    }
+
+    private String capitalizeFirstLetters(String str) {
+        str = str.toLowerCase();
+        StringBuilder stringBuilder = new StringBuilder();
+        for (String s : SPACE_SPLITTER.split(str)) {
+            if(Character.isLetter(s.charAt(0))) {
+                stringBuilder.append(s.replaceFirst(String.valueOf(s.charAt(0)), String.valueOf(Character.toUpperCase(s.charAt(0)))));
+            }else {
+                stringBuilder.append(s);
+            }
+            stringBuilder.append(" ");
+        }
+        return stringBuilder.substring(0, stringBuilder.length() - 1);
+    }
+
+    private String getNotionNameFromPath(String path) {
+        return capitalizeFirstLetters(
+                SLASH_SPLITTER
+                        .split(path)[SLASH_SPLITTER.split(path).length - 1]
+                        .replace("_", " ")
+        );
     }
 
     private Mono<List<Tuple2<String, String>>> getNotion(List<String> keywords)  {
@@ -100,19 +122,20 @@ public class NotionsCommand implements Command {
                 .newBuilder()
                 .uri(URI.create(url))
                 .build();
-        return Mono.fromFuture(() -> client.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)))
+        return Mono.fromFuture(() -> client.sendAsync(request, HttpResponse.BodyHandlers.ofString(Charset.defaultCharset())))
                 .map(HttpResponse::body)
+                .map(body -> new String(body.getBytes(), StandardCharsets.UTF_8))
                 .flatMap(body -> Mono.fromCallable(() -> new JSONParser().parse(body)))
                 .cast(JSONObject.class)
                 .map(body -> body.get("tree"))
                 .cast(JSONArray.class)
                 .map(JSONAware::toJSONString)
                 .flatMap(string -> Mono.fromCallable(() -> new ObjectMapper().readValue(string, new TypeReference<List<JSONObject>>() {}))
-                .onErrorContinue((throwable, o) -> throwable.printStackTrace()))
+                        .onErrorContinue((throwable, o) -> throwable.printStackTrace()))
                 .flatMapIterable(list -> list)
                 .map(obj -> obj.get("path"))
                 .cast(String.class)
-                .filter(this::filter)
+                .filter(this::filterNotions)
                 .map(path -> Tuples.of(path, scorePath(path, keywords)))
                 .filter(tuple -> tuple.getT2() > 0)
                 .collectMap(Tuple2::getT1, Tuple2::getT2)
@@ -130,8 +153,8 @@ public class NotionsCommand implements Command {
                     for (String path : values) {
                         notions.add(
                                 Tuples.of(
-                                        SPLIT.split(path)[SPLIT.split(path).length - 1],
-                                        "https://github.com/readthedocs-fr/notions/blob/master/" + new String(path.getBytes(StandardCharsets.UTF_8))
+                                        path.substring(0, path.length() - ".md".length()),
+                                        "https://github.com/readthedocs-fr/notions/blob/master/" + path
                                 )
                         );
                     }
@@ -140,7 +163,7 @@ public class NotionsCommand implements Command {
     }
 
     private int scorePath(String path, List<String> keywords) {
-        return Flux.just(SPLIT.split(path.toLowerCase().replaceAll(".md", "")))
+        return Flux.just(PATH_SPLITTER.split(path.toLowerCase().replaceAll(".md", "")))
                 .groupBy(Function.identity())
                 .map(GroupedFlux::key)
                 .filter(s -> this.containsStringIgnoreCase(keywords, s))
@@ -169,8 +192,8 @@ public class NotionsCommand implements Command {
         list.forEach(s -> stringBuilder.append(s).append(" "));
         return stringBuilder.substring(0, stringBuilder.toString().length() - 1);
     }
-    private boolean filter(String str) {
-        String[] files = SPLIT.split(str);
+    private boolean filterNotions(String str) {
+        String[] files = PATH_SPLITTER.split(str);
         String file = files[files.length - 1];
         return file.endsWith(".md") && !file.equalsIgnoreCase("README.md");
     }
