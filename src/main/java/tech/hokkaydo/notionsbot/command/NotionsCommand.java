@@ -21,7 +21,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,6 +52,7 @@ public class NotionsCommand implements Command {
                 ).subscribe();
             }else{
                 StringBuilder stringBuilder = new StringBuilder();
+
                 AtomicInteger i = new AtomicInteger(1);
 
                 AtomicBoolean firstSent = new AtomicBoolean(false);
@@ -63,6 +63,7 @@ public class NotionsCommand implements Command {
                         String name = getNotionNameFromPath(notion.getT1());
                         String line = i.getAndIncrement() + ". " + name + " - [" + notion.getT1().substring(0, notion.getT1().lastIndexOf("/")) + "](" + notion.getT2() + ")\n\n";
                         if (("Notion - " + (!firstSent.get() ? notions.get(0).getT1() : "Suite")).length() + stringBuilder.toString().length() + line.length() > 1024) {
+
                             sendEmbed(keywords, notions, commandContext.getChannel(), stringBuilder, firstSent);
                             firstSent.set(true);
                             stringBuilder.delete(0, stringBuilder.toString().length());
@@ -92,7 +93,6 @@ public class NotionsCommand implements Command {
                 false
         )).subscribe();
     }
-
     private String capitalizeFirstLetters(String str) {
         str = str.toLowerCase();
         StringBuilder stringBuilder = new StringBuilder();
@@ -114,7 +114,7 @@ public class NotionsCommand implements Command {
                         .replace("_", " ")
         );
     }
-
+  
     private Mono<List<Tuple2<String, String>>> getNotion(List<String> keywords)  {
         String url = "https://api.github.com/repos/readthedocs-fr/notions/git/trees/master?recursive=true";
         HttpClient client = HttpClient.newHttpClient();
@@ -131,7 +131,7 @@ public class NotionsCommand implements Command {
                 .cast(JSONArray.class)
                 .map(JSONAware::toJSONString)
                 .flatMap(string -> Mono.fromCallable(() -> new ObjectMapper().readValue(string, new TypeReference<List<JSONObject>>() {}))
-                        .onErrorContinue((throwable, o) -> throwable.printStackTrace()))
+                .onErrorContinue((throwable, o) -> throwable.printStackTrace()))
                 .flatMapIterable(list -> list)
                 .map(obj -> obj.get("path"))
                 .cast(String.class)
