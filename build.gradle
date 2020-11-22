@@ -30,5 +30,4 @@ dependencies {
     implementation 'com.discord4j:discord4j-core:3.1.0'
     implementation group: 'com.googlecode.json-simple', name: 'json-simple', version: '1.1.1'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
-    implementation 'org.reflections:reflections:0.9.10'
 }
